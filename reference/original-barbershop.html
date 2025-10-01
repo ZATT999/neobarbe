@@ -1,0 +1,219 @@
+<!doctype html>
+
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Barbería — Reserva de turnos</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#0b0b0b; --card:#111111; --accent:#d90429; --accent2:#ffffff; --muted:#cfcfcf;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;}
+    body{margin:0;background:linear-gradient(180deg,#070707 0%, #0f0f0f 100%);color:var(--muted);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px}
+    .container{width:100%;max-width:1200px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:14px;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,0.6);display:grid;grid-template-columns:360px 1fr;gap:20px}
+    header{grid-column:1/-1;display:flex;align-items:center;gap:16px;margin-bottom:6px}
+    .logo{width:70px;height:70px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff7b7b);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:18px;position:relative;overflow:hidden}
+    .logo:before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(135deg, rgba(255,255,255,0.12) 0 6px, transparent 6px 12px);mix-blend-mode:overlay}
+    h1{margin:0;font-size:20px;color:var(--accent2)}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+    .card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:10px}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input,button{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--accent2);outline:none}
+    .muted{font-size:13px;color:#9d9d9d}
+    .slots{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+    .slot{padding:10px;border-radius:8px;background:var(--glass);border:1px solid rgba(255,255,255,0.02);cursor:pointer;text-align:center}
+    .slot.taken{opacity:0.45;cursor:not-allowed;text-decoration:line-through}
+    .slot.selected{outline:2px solid rgba(217,4,41,0.28);box-shadow:0 6px 20px rgba(217,4,41,0.08)}
+    footer{grid-column:1/-1;margin-top:6px;text-align:center;color:#8f8f8f;font-size:13px}
+    table{width:100%;border-collapse:collapse;color:var(--muted);font-size:13px}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left}
+    @media (max-width:920px){.container{grid-template-columns:1fr}header{flex-direction:row}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">BAR</div>
+      <div>
+        <h1>Barbería — Reservas (Pago 50% por Nequi)</h1>
+        <p class="lead">Reserva tu turno de 40 minutos. Deposita el 50% a Nequi: <strong>3015378286</strong></p>
+      </div>
+    </header><aside>
+  <div class="card">
+    <h3 style="color:white;margin:0 0 10px 0">Registro de usuario</h3>
+    <label>Nombre completo</label>
+    <input id="regName" placeholder="Tu nombre" />
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="registerBtn">Registrarse</button>
+      <button id="registerAdminBtn">Iniciar como Admin</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="date">Selecciona fecha</label>
+    <input type="date" id="date" />
+
+    <label style="margin-top:12px">Valor del corte (COP)</label>
+    <input type="number" id="price" min="1000" step="100" value="30000" />
+    <div class="muted" style="margin-top:6px">Se requiere pagar el 50% para que el sistema confirme la reserva.</div>
+
+    <div style="margin-top:10px">
+      <label>Horarios disponibles</label>
+      <div id="slots" class="slots"></div>
+    </div>
+
+    <label style="margin-top:12px">Teléfono</label>
+    <input id="clientPhone" placeholder="Ej: 3001234567" />
+
+    <label style="margin-top:8px">Comprobante de pago (imagen) o referencia</label>
+    <input type="file" id="receiptFile" accept="image/*" />
+    <input id="trxRef" placeholder="Referencia / código de transacción" style="margin-top:6px" />
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button id="confirmBtn">Confirmar pago y reservar</button>
+      <button id="clearBtn" type="button">Limpiar</button>
+    </div>
+  </div>
+</aside>
+
+<main>
+  <div class="card">
+    <h3 style="margin:0;color:var(--accent2)">Panel de administración</h3>
+    <div id="adminArea" style="display:none;margin-top:8px">
+      <div class="card">
+        <h4 style="margin:0;color:white">Reservas</h4>
+        <div style="max-height:300px;overflow:auto">
+          <table id="bookingsTable"><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Tel</th><th>Depósito</th><th>Acciones</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <h4 style="margin:0;color:white">Gráfica de datos</h4>
+        <canvas id="statsChart" height="150"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <footer>Demo con <strong>localStorage</strong>. En producción, usar backend seguro y API de Nequi.</footer>
+</main>
+
+  </div>  <script>
+    const NEQUI_NUMBER = '3015378286';
+    const SLOT_MINUTES = 40;
+    const OPENING = '09:00';
+    const CLOSING = '18:00';
+    const STORAGE_KEY = 'barber_bookings_v1';
+    const USERS_KEY = 'barber_users_v1';
+    const ADMIN_KEY = 'barber_admin_device';
+
+    const dateInput = document.getElementById('date');
+    const slotsDiv = document.getElementById('slots');
+    const priceInput = document.getElementById('price');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const clientPhone = document.getElementById('clientPhone');
+    const receiptFile = document.getElementById('receiptFile');
+    const trxRef = document.getElementById('trxRef');
+
+    const regName = document.getElementById('regName');
+    const registerBtn = document.getElementById('registerBtn');
+    const registerAdminBtn = document.getElementById('registerAdminBtn');
+    const adminArea = document.getElementById('adminArea');
+
+    let currentUser = null;
+
+    function minutesToTime(min){const h=Math.floor(min/60).toString().padStart(2,'0');const m=(min%60).toString().padStart(2,'0');return `${h}:${m}`;}
+    function timeToMinutes(t){const [h,m]=t.split(':').map(Number);return h*60+m}
+
+    function loadBookings(){try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') }catch(e){return []}}
+    function saveBookings(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)) }
+    function loadUsers(){try{ return JSON.parse(localStorage.getItem(USERS_KEY) || '[]') }catch(e){return []}}
+    function saveUsers(arr){ localStorage.setItem(USERS_KEY, JSON.stringify(arr)) }
+
+    const today=new Date();dateInput.min=today.toISOString().split('T')[0];dateInput.value=dateInput.min;
+
+    function generateSlotsFor(dateStr){
+      const slots=[];const start=timeToMinutes(OPENING),end=timeToMinutes(CLOSING);
+      for(let t=start;t+SLOT_MINUTES<=end+1;t+=SLOT_MINUTES){
+        const from=minutesToTime(t);const to=minutesToTime(t+SLOT_MINUTES);
+        slots.push({from,to,iso:`${dateStr}T${from}`});
+      }return slots;
+    }
+
+    function renderSlots(){
+      slotsDiv.innerHTML='';
+      const date=dateInput.value;
+      const slots=generateSlotsFor(date);
+      const bookings=loadBookings();
+      slots.forEach(s=>{
+        const el=document.createElement('div');el.className='slot';
+        const taken=bookings.find(b=>b.date===date && b.from===s.from);
+        if(taken){el.classList.add('taken');el.textContent=`${s.from} - ${s.to}`}
+        else{el.textContent=`${s.from} - ${s.to}`;el.addEventListener('click',()=>selectSlot(s))}
+        slotsDiv.appendChild(el);
+      });
+    }
+
+    let selectedSlot=null;
+    function selectSlot(s){selectedSlot={date:dateInput.value,from:s.from,to:s.to};}
+
+    confirmBtn.addEventListener('click', async ()=>{
+      if(!currentUser){alert('Debes registrarte primero');return;}
+      if(!selectedSlot){alert('Selecciona un turno antes de confirmar.');return;}
+      const phone=clientPhone.value.trim();if(!phone){alert('Ingresa tu teléfono');return;}
+      const file=receiptFile.files[0];const ref=trxRef.value.trim();if(!file&&!ref){alert('Sube comprobante o escribe referencia');return;}
+      let fileData=null;if(file){fileData=await readFileAsDataURL(file)}
+      const bookings=loadBookings();
+      const clash=bookings.find(b=>b.date===selectedSlot.date&&b.from===selectedSlot.from);
+      if(clash){alert('Turno ya reservado');renderSlots();return;}
+      const price=Number(priceInput.value)||0;const deposit=Math.round(price*0.5);
+      const booking={id:Date.now(),date:selectedSlot.date,from:selectedSlot.from,to:selectedSlot.to,name:currentUser.name,phone,price,deposit,nequi:NEQUI_NUMBER,trxRef:ref||null,receipt:fileData||null,createdAt:new Date().toISOString()};
+      bookings.push(booking);saveBookings(bookings);
+      alert('Reserva guardada ✅');selectedSlot=null;renderSlots();if(isAdminDevice()) renderAdminTable();
+    });
+
+    clearBtn.addEventListener('click',()=>{clientPhone.value='';trxRef.value='';receiptFile.value='';selectedSlot=null;renderSlots();})
+
+    function readFileAsDataURL(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
+
+    registerBtn.addEventListener('click',()=>{
+      const name=regName.value.trim();if(!name){alert('Ingresa tu nombre');return;}
+      const users=loadUsers();const u={id:Date.now(),name};users.push(u);saveUsers(users);currentUser=u;alert('Registrado como '+name);
+    });
+
+    registerAdminBtn.addEventListener('click',()=>{
+      const name=regName.value.trim();if(!name){alert('Ingresa tu nombre');return;}
+      const pass=prompt('Ingresa contraseña de admin:');
+      if(pass!=='enrique123'){alert('Contraseña incorrecta');return;}
+      localStorage.setItem(ADMIN_KEY,'true');const users=loadUsers();const u={id:Date.now(),name,admin:true};users.push(u);saveUsers(users);currentUser=u;alert('Registrado como ADMIN');showAdminArea();
+    });
+
+    function isAdminDevice(){return localStorage.getItem(ADMIN_KEY)==='true'}
+
+    function showAdminArea(){if(isAdminDevice()){adminArea.style.display='block';renderAdminTable();renderChart();}}
+
+    function renderAdminTable(){
+      const tbody=document.querySelector('#bookingsTable tbody');tbody.innerHTML='';
+      const bookings=loadBookings().sort((a,b)=>b.id-a.id);
+      bookings.forEach(b=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${b.date}</td><td>${b.from}-${b.to}</td><td>${b.name}</td><td>${b.phone}</td><td>${b.deposit.toLocaleString('es-CO')}</td><td><button data-id='${b.id}' class='delBtn'>Eliminar</button></td>`;
+        tbody.appendChild(tr);
+      });
+      document.querySelectorAll('.delBtn').forEach(btn=>btn.addEventListener('click',e=>{
+        if(!confirm('Eliminar reserva?'))return;const id=Number(e.target.dataset.id);let bookings=loadBookings();bookings=bookings.filter(x=>x.id!==id);saveBookings(bookings);renderAdminTable();renderSlots();renderChart();
+      }));
+    }
+
+    function renderChart(){
+      const ctx=document.getElementById('statsChart');if(!ctx)return;
+      const bookings=loadBookings();const users=loadUsers();
+      const deposits=bookings.reduce((a,b)=>a+b.deposit,0);
+      const chart=new Chart(ctx,{type:'bar',data:{labels:['Depósitos','Usuarios'],datasets:[{label:'Estadísticas',data:[deposits,users.length]}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}});
+    }
+
+    renderSlots();showAdminArea();
+  </script></body>
+</html>
