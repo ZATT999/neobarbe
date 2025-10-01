@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
 import { sendBookingNotification, sendCancellationNotification } from "@/lib/sms-notifications"
-import { sendBookingEmailNotification, sendCancellationEmailNotification } from "@/lib/email-notifications"
 import { sendWhatsAppBookingNotification, sendWhatsAppCancellationNotification } from "@/lib/whatsapp-notifications"
 
 export interface User {
@@ -356,16 +355,6 @@ export const supabaseStorage = {
         )
         console.log("[v0] SMS notification sent for new booking")
 
-        await sendBookingEmailNotification(
-          booking.name,
-          booking.phone,
-          booking.service_type,
-          booking.date,
-          `${booking.from} - ${booking.to}`,
-          booking.price,
-        )
-        console.log("[v0] Email notification sent for new booking")
-
         await sendWhatsAppBookingNotification(
           booking.name,
           booking.phone,
@@ -410,16 +399,6 @@ export const supabaseStorage = {
           "Cancelada por administrador",
         )
         console.log("[v0] SMS notification sent for booking cancellation")
-
-        await sendCancellationEmailNotification(
-          bookingData.name,
-          bookingData.phone,
-          bookingData.service_type || "Corte de cabello",
-          bookingData.date,
-          `${bookingData.from} - ${bookingData.to}`,
-          "Cancelada por administrador",
-        )
-        console.log("[v0] Email notification sent for booking cancellation")
 
         await sendWhatsAppCancellationNotification(
           bookingData.name,
@@ -471,16 +450,6 @@ export const supabaseStorage = {
         reason,
       )
       console.log("[v0] SMS notification sent for booking cancellation")
-
-      await sendCancellationEmailNotification(
-        booking.name,
-        booking.phone,
-        booking.service_type || "Corte de cabello",
-        booking.date,
-        `${booking.from} - ${booking.to}`,
-        reason,
-      )
-      console.log("[v0] Email notification sent for booking cancellation")
 
       await sendWhatsAppCancellationNotification(
         booking.name,
